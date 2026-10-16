@@ -20,6 +20,7 @@ Data ingestion, validation and real-time processing gateway for the Smart-X IoT 
 
 ### Part 2 additions
 
+- Main menu navigation: `SmartX.Client/MainForm.cs`, both pillars are non-modal and single-instance tracked, so they can be open and updating at the same time instead of blocking each other, clicking a button again brings the existing window forward rather than opening a duplicate
 - `Queue<T>`: `SmartX.Api/Data/TelemetryIngestionQueue.cs`, standard FIFO path for incoming telemetry
 - `PriorityQueue`: same file, critical alerts (severe spikes/drops) bypass the standard queue entirely
 - Background processing engine: `SmartX.Api/Data/TelemetryProcessingService.cs`, a `BackgroundService` that drains the queues continuously, critical first, this is what actually applies readings now instead of the controller doing it inline
@@ -97,7 +98,7 @@ The "Network Topology and Mesh Routing" button is still disabled on purpose, tha
 
 ## Testing the Part 2 data structures
 
-Close the Sensor Data Ingestion dashboard and open **Real-Time Command Stream and History** from the main menu instead. Leave the ingestion dashboard's simulation running in the background if you want live telemetry flowing while you test this page too, both pillars work at the same time without losing state.
+Open **Real-Time Command Stream and History** from the main menu alongside the ingestion dashboard, both windows are non-modal now, so you can have both open side by side, each updating live every 2 seconds independently. Clicking a main menu button again just brings the existing window to the front instead of opening a duplicate.
 
 **To simulate a high-priority alert (Queue vs PriorityQueue):**
 1. On the Sensor Data Ingestion dashboard, register or use an existing Environmental or PowerConsumption sensor
