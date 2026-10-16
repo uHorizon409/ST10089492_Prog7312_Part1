@@ -6,6 +6,14 @@ public class MainForm : Form
 {
     private readonly ApiClient _apiClient = new(AppConfig.GetApiBaseUrl());
 
+    // kept non-modal and tracked here so both pillars can be open and
+    // updating live at the same time instead of forcing close then reopen
+    // to switch between them, each one still pulls its own state from the
+    // api fresh so nothing is lost either way, this just makes switching
+    // between them not block each other
+    private DashboardForm? _dashboardForm;
+    private CommandStreamForm? _commandStreamForm;
+
     public MainForm()
     {
         InitializeComponent();
@@ -65,13 +73,29 @@ public class MainForm : Form
 
     private void IngestionButton_Click(object? sender, EventArgs e)
     {
-        using var dashboard = new DashboardForm(_apiClient);
-        dashboard.ShowDialog(this);
+        if (_dashboardForm == null || _dashboardForm.IsDisposed)
+        {
+            _dashboardForm = new DashboardForm(_apiClient);
+            _dashboardForm.FormClosed += (s, e) => _dashboardForm = null;
+            _dashboardForm.Show(this);
+        }
+        else
+        {
+            _dashboardForm.Activate();
+        }
     }
 
     private void CommandButton_Click(object? sender, EventArgs e)
     {
-        using var commandStream = new CommandStreamForm(_apiClient);
-        commandStream.ShowDialog(this);
+        if (_commandStreamForm == null || _commandStreamForm.IsDisposed)
+        {
+            _commandStreamForm = new CommandStreamForm(_apiClient);
+            _commandStreamForm.FormClosed += (s, e) => _commandStreamForm = null;
+            _commandStreamForm.Show(this);
+        }
+        else
+        {
+            _commandStreamForm.Activate();
+        }
     }
 }
