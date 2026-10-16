@@ -14,6 +14,12 @@ public class CommandStreamForm : Form
     private ComboBox _commandTypeCombo = null!;
     private TextBox _targetMacTextBox = null!;
     private Label _statusLabel = null!;
+    private TextBox _searchTextBox = null!;
+    private ComboBox _categoryFilterCombo = null!;
+    private CheckBox _activeAlertsOnlyCheckBox = null!;
+    private ListBox _suggestionsList = null!;
+    private ListBox _historyList = null!;
+    private List<SensorRegistration> _lastSensors = new();
 
     public CommandStreamForm(ApiClient apiClient)
     {
@@ -64,11 +70,30 @@ public class CommandStreamForm : Form
             ForeColor = Color.DarkRed
         };
 
+        var searchLabel = new Label { Text = "Search", Location = new Point(10, 70), AutoSize = true };
+        _searchTextBox = new TextBox { Location = new Point(10, 90), Width = 220 };
+
+        var categoryLabel = new Label { Text = "Category", Location = new Point(240, 70), AutoSize = true };
+        _categoryFilterCombo = new ComboBox
+        {
+            Location = new Point(240, 90),
+            Width = 150,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        _categoryFilterCombo.Items.Add("All");
+        _categoryFilterCombo.Items.AddRange(Enum.GetNames(typeof(SensorCategory)));
+        _categoryFilterCombo.SelectedIndex = 0;
+
+        _activeAlertsOnlyCheckBox = new CheckBox { Text = "Active alerts only", Location = new Point(400, 92), AutoSize = true };
+
+        var searchButton = new Button { Text = "Search", Location = new Point(560, 88), Width = 90 };
+        searchButton.Click += async (s, e) => await SearchAsync();
+
         _grid = new DataGridView
         {
-            Location = new Point(10, 70),
+            Location = new Point(10, 125),
             Width = 910,
-            Height = 300,
+            Height = 220,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
             ReadOnly = true,
             AllowUserToAddRows = false,
@@ -82,6 +107,36 @@ public class CommandStreamForm : Form
         _grid.Columns.Add("Override", "Override");
         _grid.Columns.Add("Status", "Status");
 
+        var suggestionsLabel = new Label
+        {
+            Text = "Suggested Actions / Automated Insights",
+            Location = new Point(10, 355),
+            AutoSize = true,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        _suggestionsList = new ListBox
+        {
+            Location = new Point(10, 375),
+            Width = 910,
+            Height = 90,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+        };
+
+        var historyLabel = new Label
+        {
+            Text = "Command History (most recent first)",
+            Location = new Point(10, 470),
+            AutoSize = true,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        _historyList = new ListBox
+        {
+            Location = new Point(10, 490),
+            Width = 910,
+            Height = 90,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+        };
+
         Controls.Add(commandLabel);
         Controls.Add(_commandTypeCombo);
         Controls.Add(macLabel);
@@ -89,7 +144,28 @@ public class CommandStreamForm : Form
         Controls.Add(issueButton);
         Controls.Add(undoButton);
         Controls.Add(_statusLabel);
+        Controls.Add(searchLabel);
+        Controls.Add(_searchTextBox);
+        Controls.Add(categoryLabel);
+        Controls.Add(_categoryFilterCombo);
+        Controls.Add(_activeAlertsOnlyCheckBox);
+        Controls.Add(searchButton);
         Controls.Add(_grid);
+        Controls.Add(suggestionsLabel);
+        Controls.Add(_suggestionsList);
+        Controls.Add(historyLabel);
+        Controls.Add(_historyList);
+    }
+
+    private async Task SearchAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchTextBox.Text))
+        {
+            await _apiClient.RecordActionAsync(_searchTextBox.Text.Trim());
+        }
+
+        ApplyFilterToGrid();
+        await RefreshSuggestionsAsync();
     }
 
     private async Task IssueCommandAsync()
@@ -136,14 +212,44 @@ public class CommandStreamForm : Form
 
     private async Task RefreshGridAsync()
     {
-        var sensors = await _apiClient.GetSensorsAsync();
+        _lastSensors = await _apiClient.GetSensorsAsync();
+        ApplyFilterToGrid();
+        await RefreshSuggestionsAsync();
+        await RefreshHistoryAsync();
+    }
+
+    // filters whatever was last fetched instead of hitting the api again,
+    // search and category/alert filters all run against the same snapshot
+    private void ApplyFilterToGrid()
+    {
+        var search = _searchTextBox.Text.Trim();
+        var categoryFilter = (string)_categoryFilterCombo.SelectedItem!;
+        bool alertsOnly = _activeAlertsOnlyCheckBox.Checked;
+
         _grid.Rows.Clear();
 
-        foreach (var sensor in sensors)
+        foreach (var sensor in _lastSensors)
         {
             bool anomalous = AnomalyChecker.IsReadingAnomalous(sensor.Category, sensor.LastReading);
             bool disconnected = AnomalyChecker.IsDisconnected(sensor.LastSeen, TimeSpan.FromSeconds(30));
             string status = disconnected ? "DISCONNECTED" : anomalous ? "ANOMALY" : "OK";
+
+            if (!string.IsNullOrWhiteSpace(search) &&
+                !sensor.MacAddress.Contains(search, StringComparison.OrdinalIgnoreCase) &&
+                !sensor.Location.Contains(search, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (categoryFilter != "All" && sensor.Category.ToString() != categoryFilter)
+            {
+                continue;
+            }
+
+            if (alertsOnly && !anomalous && !disconnected)
+            {
+                continue;
+            }
 
             int rowIndex = _grid.Rows.Add(
                 sensor.MacAddress,
@@ -169,6 +275,43 @@ public class CommandStreamForm : Form
             {
                 row.DefaultCellStyle.BackColor = Color.Honeydew;
             }
+        }
+    }
+
+    private async Task RefreshSuggestionsAsync()
+    {
+        var result = await _apiClient.GetSuggestionsAsync();
+        _suggestionsList.Items.Clear();
+
+        foreach (var suggestion in result.PatternSuggestions)
+        {
+            _suggestionsList.Items.Add($"Suggested: {suggestion.Text} ({suggestion.Reason})");
+        }
+
+        foreach (var insight in result.AutomatedInsights)
+        {
+            _suggestionsList.Items.Add($"Insight: {insight}");
+        }
+
+        if (_suggestionsList.Items.Count == 0)
+        {
+            _suggestionsList.Items.Add("No suggestions yet, search or issue a few commands first");
+        }
+    }
+
+    private async Task RefreshHistoryAsync()
+    {
+        var history = await _apiClient.GetCommandHistoryAsync();
+        _historyList.Items.Clear();
+
+        foreach (var command in history)
+        {
+            _historyList.Items.Add(command.ToString());
+        }
+
+        if (_historyList.Items.Count == 0)
+        {
+            _historyList.Items.Add("No commands issued yet");
         }
     }
 }
