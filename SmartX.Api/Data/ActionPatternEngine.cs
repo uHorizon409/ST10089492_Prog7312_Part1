@@ -1,3 +1,5 @@
+using SmartX.Shared;
+
 namespace SmartX.Api.Data;
 
 // one thing the user did, either a search term they typed or a command
@@ -7,12 +9,6 @@ public class RecordedAction
 {
     public string Label { get; set; } = "";
     public DateTime At { get; set; } = DateTime.UtcNow;
-}
-
-public class SuggestedAction
-{
-    public string Text { get; set; } = "";
-    public string Reason { get; set; } = "";
 }
 
 // tracks what the user searches for or triggers, and how often one action

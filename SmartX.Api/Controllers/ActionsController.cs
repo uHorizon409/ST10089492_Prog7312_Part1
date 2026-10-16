@@ -24,12 +24,6 @@ public class ActionsController : ControllerBase
         public string Label { get; set; } = "";
     }
 
-    public class SuggestionsResponse
-    {
-        public List<SuggestedAction> PatternSuggestions { get; set; } = new();
-        public List<string> AutomatedInsights { get; set; } = new();
-    }
-
     // called whenever the user searches for something on the command stream page
     [HttpPost("record")]
     public IActionResult Record(RecordActionRequest request)
@@ -44,9 +38,9 @@ public class ActionsController : ControllerBase
     }
 
     [HttpGet("suggestions")]
-    public ActionResult<SuggestionsResponse> GetSuggestions()
+    public ActionResult<SuggestionsResult> GetSuggestions()
     {
-        var response = new SuggestionsResponse();
+        var response = new SuggestionsResult();
 
         var lastAction = _patternEngine.LastAction;
         if (lastAction != null)
