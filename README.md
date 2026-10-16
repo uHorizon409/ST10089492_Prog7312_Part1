@@ -1,6 +1,6 @@
-# Smart-X IoT Mesh Gateway (PROG7312 POE Part 1)
+# Smart-X IoT Mesh Gateway (PROG7312 POE Part 1 and Part 2)
 
-Data ingestion and validation gateway for the Smart-X IoT scenario. Built with .NET 10.
+Data ingestion, validation and real-time processing gateway for the Smart-X IoT scenario. Built with .NET 10.
 
 ## Project layout
 
@@ -17,6 +17,18 @@ Data ingestion and validation gateway for the Smart-X IoT scenario. Built with .
 - File upload: `AttachmentsController` on the API, `OpenFileDialog` on the client
 - Dynamic engagement feature: anomaly highlighting, sensor rows in the dashboard change colour when a reading is out of range or a sensor stops reporting (matches the Task 1 research report)
 - Server side validation: `SensorsController` rejects a bad mac address format, an unknown category, and duplicate mac addresses, and returns the real reason so the client can show it
+
+### Part 2 additions
+
+- `Queue<T>`: `SmartX.Api/Data/TelemetryIngestionQueue.cs`, standard FIFO path for incoming telemetry
+- `PriorityQueue`: same file, critical alerts (severe spikes/drops) bypass the standard queue entirely
+- Background processing engine: `SmartX.Api/Data/TelemetryProcessingService.cs`, a `BackgroundService` that drains the queues continuously, critical first, this is what actually applies readings now instead of the controller doing it inline
+- `Stack<T>`: `SmartX.Api/Data/CommandHistoryStack.cs`, manual override command history with undo
+- `Dictionary<TKey,TValue>`: `SmartX.Api/Data/DeviceRegistry.cs`, devices keyed by MAC address for O(1) lookup, used when a command targets a device by MAC
+- `SortedDictionary`: `SmartX.Api/Data/TimestampedLogStore.cs`, every reading kept in timestamp order automatically
+- `HashSet<T>`: `SmartX.Api/Data/DeviceAlertTracker.cs`, dedupes repeated disconnect/anomaly alerts for the same device
+- Predictive Action Engine: `SmartX.Api/Data/ActionPatternEngine.cs`, tracks which actions (searches or commands) tend to follow which, plus `ActionsController` blends that with live anomaly flags into "Suggested Actions / Automated Insights"
+- Real-Time Command Stream page: `SmartX.Client/CommandStreamForm.cs`, live sensor grid, search/filter, manual override commands (trigger pump / toggle relay / shut down all valves), undo, suggestions panel, command history
 
 ## Prerequisites
 
@@ -81,4 +93,31 @@ Make sure the API is already running first. The client reads the API address fro
 5. Click "Register New Sensor" to add your own, with MAC address, a location path (e.g. `Facility A > Zone 1 > Sub-Zone B`) and a category, optionally attaching a file
 6. Click "Aggregate Power Load" to sum up every power consumption sensor's current reading
 
-The other two menu buttons (Command Stream and Mesh Routing) are disabled on purpose, they come in Part 2 and the final PoE.
+The "Network Topology and Mesh Routing" button is still disabled on purpose, that's the final PoE.
+
+## Testing the Part 2 data structures
+
+Close the Sensor Data Ingestion dashboard and open **Real-Time Command Stream and History** from the main menu instead. Leave the ingestion dashboard's simulation running in the background if you want live telemetry flowing while you test this page too, both pillars work at the same time without losing state.
+
+**To simulate a high-priority alert (Queue vs PriorityQueue):**
+1. On the Sensor Data Ingestion dashboard, register or use an existing Environmental or PowerConsumption sensor
+2. Normal simulated readings go through the standard queue. To force a critical one, either wait for the dashboard's own random 15% spike chance, or hit the API directly:
+   ```
+   curl -X POST http://localhost:5154/api/telemetry -H "Content-Type: application/json" -d "{\"sensorId\":\"<id>\",\"value\":4500}"
+   ```
+   A PowerConsumption reading over 4000, or an Environmental reading under 5 or over 150, counts as critical and jumps the priority queue instead of the standard one
+3. Check `GET /api/telemetry/queue-status` immediately after, you can see the critical count tick up before the background service drains it a moment later
+
+**To test manual override commands and undo (Stack):**
+1. On the Command Stream page, select a command type (Trigger Pump, Toggle Relay, or Shut Down All Valves)
+2. For Trigger Pump or Toggle Relay, type the target device's MAC address (this is the Dictionary-based lookup, `DeviceRegistry`, resolving by MAC)
+3. Click Issue Command, the grid's Override column updates, and the Sensor Data Ingestion dashboard will show the same actuator's simulated reading reflecting it (1 for on, 0 for off) within a couple of seconds
+4. Click Undo Last, the most recently issued command is reverted, including a bulk Shut Down All Valves command, every device it touched gets its individual previous state back
+
+**To test search/filter and the Predictive Action Engine:**
+1. Type a device MAC or location into Search and click Search, the grid filters to matching rows, and the search term is recorded as an action
+2. Use the Category dropdown or the Active Alerts Only checkbox to narrow the grid further
+3. Issue a command shortly after searching for a related device a few times, the Suggested Actions panel will start recommending that command the next time you search for the same term, this is the pattern engine picking up on repeated search-then-command behaviour
+4. Any sensor currently out of range or disconnected shows up under Automated Insights automatically, without needing to search for it first
+
+**To test the SortedDictionary timeline store:** every reading processed by the background service is recorded in `TimestampedLogStore` in timestamp order automatically, this backs the historical log but isn't exposed through its own UI panel yet, it's there for the final PoE's mesh/timeline view to build on.
