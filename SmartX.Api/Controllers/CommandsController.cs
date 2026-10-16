@@ -11,12 +11,18 @@ public class CommandsController : ControllerBase
     private readonly SensorStore _sensorStore;
     private readonly DeviceRegistry _deviceRegistry;
     private readonly CommandHistoryStack _history;
+    private readonly ActionPatternEngine _patternEngine;
 
-    public CommandsController(SensorStore sensorStore, DeviceRegistry deviceRegistry, CommandHistoryStack history)
+    public CommandsController(
+        SensorStore sensorStore,
+        DeviceRegistry deviceRegistry,
+        CommandHistoryStack history,
+        ActionPatternEngine patternEngine)
     {
         _sensorStore = sensorStore;
         _deviceRegistry = deviceRegistry;
         _history = history;
+        _patternEngine = patternEngine;
     }
 
     public class IssueCommandRequest
@@ -76,6 +82,11 @@ public class CommandsController : ControllerBase
         }
 
         _history.Push(command);
+
+        // feeds the predictive engine, so a command counts as an action just
+        // like a search does for working out what tends to follow what
+        _patternEngine.Record(request.Type.ToString());
+
         return Ok(command);
     }
 
