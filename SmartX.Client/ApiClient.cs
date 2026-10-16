@@ -59,6 +59,12 @@ public class ApiClient
         return result ?? new List<double>();
     }
 
+    public async Task<List<QueuedTelemetry>> GetTimelineAsync(string sensorId)
+    {
+        var result = await _http.GetFromJsonAsync<List<QueuedTelemetry>>($"api/telemetry/{sensorId}/timeline");
+        return result ?? new List<QueuedTelemetry>();
+    }
+
     public async Task<bool> UploadAttachmentAsync(string sensorId, string filePath)
     {
         using var form = new MultipartFormDataContent();

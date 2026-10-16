@@ -89,6 +89,9 @@ public class CommandStreamForm : Form
         var searchButton = new Button { Text = "Search", Location = new Point(560, 88), Width = 90 };
         searchButton.Click += async (s, e) => await SearchAsync();
 
+        var timelineButton = new Button { Text = "View Timeline", Location = new Point(660, 88), Width = 120 };
+        timelineButton.Click += (s, e) => OpenTimelineForSelectedRow();
+
         _grid = new DataGridView
         {
             Location = new Point(10, 125),
@@ -100,12 +103,14 @@ public class CommandStreamForm : Form
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect
         };
+        _grid.Columns.Add("Id", "Sensor Id");
         _grid.Columns.Add("Mac", "MAC Address");
         _grid.Columns.Add("Location", "Location");
         _grid.Columns.Add("Category", "Category");
         _grid.Columns.Add("Reading", "Last Reading");
         _grid.Columns.Add("Override", "Override");
         _grid.Columns.Add("Status", "Status");
+        _grid.Columns["Id"]!.Visible = false;
 
         var suggestionsLabel = new Label
         {
@@ -150,6 +155,7 @@ public class CommandStreamForm : Form
         Controls.Add(_categoryFilterCombo);
         Controls.Add(_activeAlertsOnlyCheckBox);
         Controls.Add(searchButton);
+        Controls.Add(timelineButton);
         Controls.Add(_grid);
         Controls.Add(suggestionsLabel);
         Controls.Add(_suggestionsList);
@@ -166,6 +172,23 @@ public class CommandStreamForm : Form
 
         ApplyFilterToGrid();
         await RefreshSuggestionsAsync();
+    }
+
+    private void OpenTimelineForSelectedRow()
+    {
+        if (_grid.SelectedRows.Count == 0)
+        {
+            _statusLabel.ForeColor = Color.DarkRed;
+            _statusLabel.Text = "select a row first to view its timeline";
+            return;
+        }
+
+        var row = _grid.SelectedRows[0];
+        var sensorId = (string)row.Cells["Id"].Value!;
+        var mac = (string)row.Cells["Mac"].Value!;
+
+        using var timeline = new TimelineForm(_apiClient, sensorId, mac);
+        timeline.ShowDialog(this);
     }
 
     private async Task IssueCommandAsync()
@@ -252,6 +275,7 @@ public class CommandStreamForm : Form
             }
 
             int rowIndex = _grid.Rows.Add(
+                sensor.Id,
                 sensor.MacAddress,
                 sensor.Location,
                 sensor.Category,
