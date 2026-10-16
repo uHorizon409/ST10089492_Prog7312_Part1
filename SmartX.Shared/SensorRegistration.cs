@@ -9,6 +9,10 @@ public class SensorRegistration
     public double LastReading { get; set; }
     public DateTime LastSeen { get; set; } = DateTime.UtcNow;
     public List<string> AttachmentFileNames { get; set; } = new();
+
+    // for actuators, true means a manual override is on (pump running, relay
+    // closed etc), the simulator respects this instead of picking a random value
+    public bool OverrideActive { get; set; }
 }
 
 // checks readings and last seen time so the dashboard knows what to highlight
