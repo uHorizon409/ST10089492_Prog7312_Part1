@@ -69,4 +69,55 @@ public class ApiClient
         var response = await _http.PostAsync($"api/sensors/{sensorId}/attachments", form);
         return response.IsSuccessStatusCode;
     }
+
+    public class IssueCommandResult
+    {
+        public DeviceCommand? Command { get; set; }
+        public string? Error { get; set; }
+    }
+
+    public async Task<IssueCommandResult> IssueCommandAsync(CommandType type, string? targetMacAddress)
+    {
+        var response = await _http.PostAsJsonAsync("api/commands", new { type, targetMacAddress });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            return new IssueCommandResult { Error = string.IsNullOrWhiteSpace(error) ? "command failed" : error };
+        }
+
+        var command = await response.Content.ReadFromJsonAsync<DeviceCommand>();
+        return new IssueCommandResult { Command = command };
+    }
+
+    public async Task<IssueCommandResult> UndoLastCommandAsync()
+    {
+        var response = await _http.PostAsync("api/commands/undo", null);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            return new IssueCommandResult { Error = string.IsNullOrWhiteSpace(error) ? "undo failed" : error };
+        }
+
+        var command = await response.Content.ReadFromJsonAsync<DeviceCommand>();
+        return new IssueCommandResult { Command = command };
+    }
+
+    public async Task<List<DeviceCommand>> GetCommandHistoryAsync()
+    {
+        var result = await _http.GetFromJsonAsync<List<DeviceCommand>>("api/commands/history");
+        return result ?? new List<DeviceCommand>();
+    }
+
+    public async Task RecordActionAsync(string label)
+    {
+        await _http.PostAsJsonAsync("api/actions/record", new { label });
+    }
+
+    public async Task<SuggestionsResult> GetSuggestionsAsync()
+    {
+        var result = await _http.GetFromJsonAsync<SuggestionsResult>("api/actions/suggestions");
+        return result ?? new SuggestionsResult();
+    }
 }
