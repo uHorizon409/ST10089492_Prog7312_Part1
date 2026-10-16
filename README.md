@@ -119,5 +119,6 @@ Close the Sensor Data Ingestion dashboard and open **Real-Time Command Stream an
 2. Use the Category dropdown or the Active Alerts Only checkbox to narrow the grid further
 3. Issue a command shortly after searching for a related device a few times, the Suggested Actions panel will start recommending that command the next time you search for the same term, this is the pattern engine picking up on repeated search-then-command behaviour
 4. Any sensor currently out of range or disconnected shows up under Automated Insights automatically, without needing to search for it first
+5. Search for a problem device's MAC a few times, then fix it with a command each time. Once the pattern engine has seen that happen 2-3 times, the next time that exact device goes into an alert state, its Automated Insight line will include a learned fix, e.g. "...is out of range, last reading 9.0 -> try TriggerPump (followed this device 3 time(s) before)", not just the bare flag
 
 **To test the SortedDictionary timeline view:** select any row in the Command Stream grid and click View Timeline. Every reading the background service processes is recorded in `TimestampedLogStore` in timestamp order automatically, and this draws it as a real line graph, oldest reading on the left. Click Refresh on the timeline window while telemetry keeps coming in to watch it grow live.
