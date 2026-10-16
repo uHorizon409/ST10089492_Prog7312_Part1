@@ -11,12 +11,18 @@ public class TelemetryController : ControllerBase
     private readonly SensorStore _sensorStore;
     private readonly TelemetryHistoryStore _historyStore;
     private readonly TelemetryIngestionQueue _queue;
+    private readonly TimestampedLogStore _logStore;
 
-    public TelemetryController(SensorStore sensorStore, TelemetryHistoryStore historyStore, TelemetryIngestionQueue queue)
+    public TelemetryController(
+        SensorStore sensorStore,
+        TelemetryHistoryStore historyStore,
+        TelemetryIngestionQueue queue,
+        TimestampedLogStore logStore)
     {
         _sensorStore = sensorStore;
         _historyStore = historyStore;
         _queue = queue;
+        _logStore = logStore;
     }
 
     public class TelemetryReadingRequest
@@ -86,5 +92,13 @@ public class TelemetryController : ControllerBase
     public IActionResult GetQueueStatus()
     {
         return Ok(new { Standard = _queue.StandardCount, Critical = _queue.CriticalCount });
+    }
+
+    // backed by the sorted dictionary log store, already in timestamp order
+    // so this is just handing back what was asked for, not sorting anything here
+    [HttpGet("{sensorId}/timeline")]
+    public ActionResult<List<QueuedTelemetry>> GetTimeline(string sensorId)
+    {
+        return Ok(_logStore.GetTimelineFor(sensorId));
     }
 }
