@@ -25,10 +25,10 @@ Data ingestion, validation and real-time processing gateway for the Smart-X IoT 
 - Background processing engine: `SmartX.Api/Data/TelemetryProcessingService.cs`, a `BackgroundService` that drains the queues continuously, critical first, this is what actually applies readings now instead of the controller doing it inline
 - `Stack<T>`: `SmartX.Api/Data/CommandHistoryStack.cs`, manual override command history with undo
 - `Dictionary<TKey,TValue>`: `SmartX.Api/Data/DeviceRegistry.cs`, devices keyed by MAC address for O(1) lookup, used when a command targets a device by MAC
-- `SortedDictionary`: `SmartX.Api/Data/TimestampedLogStore.cs`, every reading kept in timestamp order automatically
+- `SortedDictionary`: `SmartX.Api/Data/TimestampedLogStore.cs`, every reading kept in timestamp order automatically, drawn as a real line graph in `SmartX.Client/TimelineForm.cs`
 - `HashSet<T>`: `SmartX.Api/Data/DeviceAlertTracker.cs`, dedupes repeated disconnect/anomaly alerts for the same device
 - Predictive Action Engine: `SmartX.Api/Data/ActionPatternEngine.cs`, tracks which actions (searches or commands) tend to follow which, plus `ActionsController` blends that with live anomaly flags into "Suggested Actions / Automated Insights"
-- Real-Time Command Stream page: `SmartX.Client/CommandStreamForm.cs`, live sensor grid, search/filter, manual override commands (trigger pump / toggle relay / shut down all valves), undo, suggestions panel, command history
+- Real-Time Command Stream page: `SmartX.Client/CommandStreamForm.cs`, live sensor grid, search/filter, manual override commands (trigger pump / toggle relay / shut down all valves), undo, suggestions panel, command history, per sensor timeline view
 
 ## Prerequisites
 
@@ -120,4 +120,4 @@ Close the Sensor Data Ingestion dashboard and open **Real-Time Command Stream an
 3. Issue a command shortly after searching for a related device a few times, the Suggested Actions panel will start recommending that command the next time you search for the same term, this is the pattern engine picking up on repeated search-then-command behaviour
 4. Any sensor currently out of range or disconnected shows up under Automated Insights automatically, without needing to search for it first
 
-**To test the SortedDictionary timeline store:** every reading processed by the background service is recorded in `TimestampedLogStore` in timestamp order automatically, this backs the historical log but isn't exposed through its own UI panel yet, it's there for the final PoE's mesh/timeline view to build on.
+**To test the SortedDictionary timeline view:** select any row in the Command Stream grid and click View Timeline. Every reading the background service processes is recorded in `TimestampedLogStore` in timestamp order automatically, and this draws it as a real line graph, oldest reading on the left. Click Refresh on the timeline window while telemetry keeps coming in to watch it grow live.
