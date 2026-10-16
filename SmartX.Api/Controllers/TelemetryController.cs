@@ -10,11 +10,13 @@ public class TelemetryController : ControllerBase
 {
     private readonly SensorStore _sensorStore;
     private readonly TelemetryHistoryStore _historyStore;
+    private readonly TelemetryIngestionQueue _queue;
 
-    public TelemetryController(SensorStore sensorStore, TelemetryHistoryStore historyStore)
+    public TelemetryController(SensorStore sensorStore, TelemetryHistoryStore historyStore, TelemetryIngestionQueue queue)
     {
         _sensorStore = sensorStore;
         _historyStore = historyStore;
+        _queue = queue;
     }
 
     public class TelemetryReadingRequest
@@ -42,29 +44,33 @@ public class TelemetryController : ControllerBase
             return BadRequest("value must be a real number");
         }
 
-        // wrap it in a TelemetryPacket, the client already sends a typed packet
-        // per category, this is the api side receiving the raw number for storage
-        var packet = new TelemetryPacket<double>(request.SensorId, request.Value);
-
-        bool updated = _sensorStore.UpdateReading(packet.SensorId, packet.Value);
-        if (!updated)
+        var sensor = _sensorStore.Get(request.SensorId);
+        if (sensor == null)
         {
             return NotFound("sensor not registered");
         }
 
-        _historyStore.AddBatch(packet.SensorId, new[] { packet.Value });
+        // dont process inline, drop it on the queue and return straight away,
+        // the background service drains it, critical alerts jump the standard queue
+        bool critical = CriticalAlertChecker.IsCritical(sensor.Category, request.Value);
+        _queue.Enqueue(new QueuedTelemetry { SensorId = request.SensorId, Value = request.Value }, critical);
 
-        return Ok(new { packet.SensorId, packet.Value, packet.Timestamp });
+        return Ok(new { request.SensorId, request.Value, Critical = critical });
     }
 
     [HttpPost("batch")]
     public IActionResult IngestBatch(TelemetryBatchRequest request)
     {
-        _historyStore.AddBatch(request.SensorId, request.Readings);
-
-        if (request.Readings.Length > 0)
+        var sensor = _sensorStore.Get(request.SensorId);
+        if (sensor == null)
         {
-            _sensorStore.UpdateReading(request.SensorId, request.Readings[^1]);
+            return NotFound("sensor not registered");
+        }
+
+        foreach (var value in request.Readings)
+        {
+            bool critical = CriticalAlertChecker.IsCritical(sensor.Category, value);
+            _queue.Enqueue(new QueuedTelemetry { SensorId = request.SensorId, Value = value }, critical);
         }
 
         return Ok(new { request.SensorId, Count = request.Readings.Length });
@@ -74,5 +80,11 @@ public class TelemetryController : ControllerBase
     public ActionResult<List<double>> GetHistory(string sensorId)
     {
         return Ok(_historyStore.GetHistory(sensorId));
+    }
+
+    [HttpGet("queue-status")]
+    public IActionResult GetQueueStatus()
+    {
+        return Ok(new { Standard = _queue.StandardCount, Critical = _queue.CriticalCount });
     }
 }

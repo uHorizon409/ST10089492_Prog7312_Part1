@@ -10,10 +10,12 @@ namespace SmartX.Api.Controllers;
 public partial class SensorsController : ControllerBase
 {
     private readonly SensorStore _store;
+    private readonly DeviceRegistry _deviceRegistry;
 
-    public SensorsController(SensorStore store)
+    public SensorsController(SensorStore store, DeviceRegistry deviceRegistry)
     {
         _store = store;
+        _deviceRegistry = deviceRegistry;
     }
 
     [GeneratedRegex(@"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")]
@@ -60,6 +62,7 @@ public partial class SensorsController : ControllerBase
         };
 
         _store.Add(sensor);
+        _deviceRegistry.Register(sensor);
         return Ok(sensor);
     }
 

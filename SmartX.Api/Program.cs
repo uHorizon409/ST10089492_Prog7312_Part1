@@ -10,6 +10,15 @@ builder.Services.AddOpenApi();
 builder.Services.AddSingleton<SensorStore>();
 builder.Services.AddSingleton<TelemetryHistoryStore>();
 
+// part 2 additions, same idea, one shared instance each
+builder.Services.AddSingleton<TelemetryIngestionQueue>();
+builder.Services.AddSingleton<CommandHistoryStack>();
+builder.Services.AddSingleton<DeviceRegistry>();
+builder.Services.AddSingleton<TimestampedLogStore>();
+builder.Services.AddSingleton<DeviceAlertTracker>();
+builder.Services.AddSingleton<ActionPatternEngine>();
+builder.Services.AddHostedService<TelemetryProcessingService>();
+
 // client runs on a different port so it needs cors turned on to call the api
 builder.Services.AddCors(options =>
 {
