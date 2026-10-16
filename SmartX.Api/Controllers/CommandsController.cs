@@ -57,6 +57,11 @@ public class CommandsController : ControllerBase
                 return NotFound("no device registered with that mac address");
             }
 
+            if (device.Category != SensorCategory.Actuator)
+            {
+                return BadRequest("override commands only apply to actuator devices");
+            }
+
             targets = new List<SensorRegistration> { device };
         }
 

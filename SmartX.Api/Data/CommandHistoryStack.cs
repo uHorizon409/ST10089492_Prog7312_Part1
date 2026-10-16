@@ -7,22 +7,35 @@ namespace SmartX.Api.Data;
 public class CommandHistoryStack
 {
     private readonly Stack<DeviceCommand> _commands = new();
+    private readonly object _lock = new();
 
     public void Push(DeviceCommand command)
     {
-        _commands.Push(command);
+        lock (_lock)
+        {
+            _commands.Push(command);
+        }
     }
 
     public DeviceCommand? Pop()
     {
-        return _commands.TryPop(out var command) ? command : null;
+        lock (_lock)
+        {
+            return _commands.TryPop(out var command) ? command : null;
+        }
     }
 
     // non destructive, used to show the history list without undoing anything
     public List<DeviceCommand> PeekAll()
     {
-        return _commands.ToList();
+        lock (_lock)
+        {
+            return _commands.ToList();
+        }
     }
 
-    public int Count => _commands.Count;
+    public int Count
+    {
+        get { lock (_lock) { return _commands.Count; } }
+    }
 }

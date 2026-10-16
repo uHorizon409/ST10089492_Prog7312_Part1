@@ -6,46 +6,59 @@ namespace SmartX.Shared;
 public class TelemetryHistoryStore
 {
     private readonly Dictionary<string, double[][]> _rawBatches = new();
+    private readonly object _lock = new();
 
     public void AddBatch(string sensorId, double[] batch)
     {
-        if (!_rawBatches.TryGetValue(sensorId, out var existing))
+        lock (_lock)
         {
-            _rawBatches[sensorId] = new double[][] { batch };
-            return;
-        }
+            if (!_rawBatches.TryGetValue(sensorId, out var existing))
+            {
+                _rawBatches[sensorId] = new double[][] { batch };
+                return;
+            }
 
-        // grow the jagged array by one slot and put the new batch on the end
-        var grown = new double[existing.Length + 1][];
-        Array.Copy(existing, grown, existing.Length);
-        grown[existing.Length] = batch;
-        _rawBatches[sensorId] = grown;
+            // grow the jagged array by one slot and put the new batch on the end
+            var grown = new double[existing.Length + 1][];
+            Array.Copy(existing, grown, existing.Length);
+            grown[existing.Length] = batch;
+            _rawBatches[sensorId] = grown;
+        }
     }
 
     public List<double> GetHistory(string sensorId)
     {
-        var history = new List<double>();
-
-        if (!_rawBatches.TryGetValue(sensorId, out var batches))
+        lock (_lock)
         {
+            var history = new List<double>();
+
+            if (!_rawBatches.TryGetValue(sensorId, out var batches))
+            {
+                return history;
+            }
+
+            foreach (double[] batch in batches)
+            {
+                history.AddRange(batch);
+            }
+
             return history;
         }
-
-        foreach (double[] batch in batches)
-        {
-            history.AddRange(batch);
-        }
-
-        return history;
     }
 
     public int GetBatchCount(string sensorId)
     {
-        return _rawBatches.TryGetValue(sensorId, out var batches) ? batches.Length : 0;
+        lock (_lock)
+        {
+            return _rawBatches.TryGetValue(sensorId, out var batches) ? batches.Length : 0;
+        }
     }
 
     public IEnumerable<string> GetTrackedSensorIds()
     {
-        return _rawBatches.Keys;
+        lock (_lock)
+        {
+            return _rawBatches.Keys.ToList();
+        }
     }
 }
