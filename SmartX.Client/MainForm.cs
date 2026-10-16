@@ -39,13 +39,13 @@ public class MainForm : Form
 
         var commandButton = new Button
         {
-            Text = "Real-Time Command Stream and History (Coming Soon)",
+            Text = "Real-Time Command Stream and History",
             Location = new Point(20, 150),
             Width = 400,
             Height = 50,
-            Enabled = false,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
+        commandButton.Click += CommandButton_Click;
 
         var meshButton = new Button
         {
@@ -67,5 +67,11 @@ public class MainForm : Form
     {
         using var dashboard = new DashboardForm(_apiClient);
         dashboard.ShowDialog(this);
+    }
+
+    private void CommandButton_Click(object? sender, EventArgs e)
+    {
+        using var commandStream = new CommandStreamForm(_apiClient);
+        commandStream.ShowDialog(this);
     }
 }
