@@ -166,7 +166,7 @@ public class DashboardForm : Form
 
         foreach (var sensor in sensors)
         {
-            double reading = GenerateMockReading(sensor.Category);
+            double reading = GenerateMockReading(sensor);
 
             // every now and then send a spike so anomaly highlighting has
             // something real to flag while testing
@@ -206,13 +206,15 @@ public class DashboardForm : Form
         };
     }
 
-    private double GenerateMockReading(SensorCategory category)
+    private double GenerateMockReading(SensorRegistration sensor)
     {
-        return category switch
+        return sensor.Category switch
         {
             SensorCategory.Environmental => _random.Next(10, 90),
             SensorCategory.PowerConsumption => _random.Next(200, 3000),
-            SensorCategory.Actuator => _random.Next(0, 2),
+            // actuators report whatever a command last set them to instead of
+            // a random value, this is what makes part 2 overrides visible here
+            SensorCategory.Actuator => sensor.OverrideActive ? 1 : 0,
             _ => 0
         };
     }
