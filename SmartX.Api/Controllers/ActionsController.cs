@@ -49,14 +49,25 @@ public class ActionsController : ControllerBase
         }
 
         // flag every device currently sitting in an alert state, proactively,
-        // before the user has to go looking for the problem themselves
+        // before the user has to go looking for the problem themselves, and
+        // if the pattern engine has already learned what usually gets done
+        // about this exact device, recommend that fix right alongside the flag
         foreach (var sensor in _sensorStore.GetAll())
         {
-            if (_alertTracker.IsActive(sensor.Id))
+            if (!_alertTracker.IsActive(sensor.Id))
             {
-                response.AutomatedInsights.Add(
-                    $"{sensor.MacAddress} ({sensor.Location}) is out of range, last reading {sensor.LastReading:F1}");
+                continue;
             }
+
+            var insight = $"{sensor.MacAddress} ({sensor.Location}) is out of range, last reading {sensor.LastReading:F1}";
+
+            var learnedFix = _patternEngine.GetPatternSuggestions(sensor.MacAddress, max: 1);
+            if (learnedFix.Count > 0)
+            {
+                insight += $" -> try {learnedFix[0].Text} ({learnedFix[0].Reason})";
+            }
+
+            response.AutomatedInsights.Add(insight);
         }
 
         return Ok(response);
