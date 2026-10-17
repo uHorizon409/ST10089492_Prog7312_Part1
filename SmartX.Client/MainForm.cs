@@ -77,6 +77,12 @@ public class MainForm : Form
         {
             _dashboardForm = new DashboardForm(_apiClient);
             _dashboardForm.FormClosed += (s, e) => _dashboardForm = null;
+
+            // offset from the main menu so it doesnt land exactly on top of
+            // the command stream window if both are opened
+            _dashboardForm.StartPosition = FormStartPosition.Manual;
+            _dashboardForm.Location = new Point(Location.X + 40, Location.Y + 40);
+
             _dashboardForm.Show(this);
         }
         else
@@ -91,6 +97,12 @@ public class MainForm : Form
         {
             _commandStreamForm = new CommandStreamForm(_apiClient);
             _commandStreamForm.FormClosed += (s, e) => _commandStreamForm = null;
+
+            // offset the other way so both windows are visible side by side
+            // instead of stacked on top of each other
+            _commandStreamForm.StartPosition = FormStartPosition.Manual;
+            _commandStreamForm.Location = new Point(Location.X + 110, Location.Y + 90);
+
             _commandStreamForm.Show(this);
         }
         else
