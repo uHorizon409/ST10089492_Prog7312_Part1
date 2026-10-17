@@ -37,4 +37,36 @@ public static class AnomalyChecker
     {
         return DateTime.UtcNow - lastSeen > timeout;
     }
+
+    // true when the last few readings are steadily moving toward the edge
+    // of the normal range but havent crossed it yet, lets the system warn
+    // before something actually breaks instead of only after
+    public static bool IsTrendingTowardAnomaly(SensorCategory category, List<double> recentReadings)
+    {
+        if (recentReadings.Count < 3)
+        {
+            return false;
+        }
+
+        var range = Ranges[category];
+        var last3 = recentReadings.TakeLast(3).ToList();
+
+        // already anomalous is a different, more urgent alert, not a trend warning
+        if (last3[^1] < range.Min || last3[^1] > range.Max)
+        {
+            return false;
+        }
+
+        bool risingTowardMax = last3[0] < last3[1] && last3[1] < last3[2];
+        bool fallingTowardMin = last3[0] > last3[1] && last3[1] > last3[2];
+
+        double rangeSpan = range.Max - range.Min;
+        double distanceToMax = range.Max - last3[^1];
+        double distanceToMin = last3[^1] - range.Min;
+
+        bool closeToMax = distanceToMax <= rangeSpan * 0.15;
+        bool closeToMin = distanceToMin <= rangeSpan * 0.15;
+
+        return (risingTowardMax && closeToMax) || (fallingTowardMin && closeToMin);
+    }
 }
