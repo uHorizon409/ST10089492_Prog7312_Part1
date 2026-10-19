@@ -64,8 +64,9 @@ public class CommandStreamForm : Form
 
         _statusLabel = new Label
         {
-            Location = new Point(660, 38),
+            Location = new Point(660, 10),
             Width = 270,
+            Height = 55,
             AutoSize = false,
             ForeColor = Color.DarkRed
         };
