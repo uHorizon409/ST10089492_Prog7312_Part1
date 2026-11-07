@@ -12,19 +12,22 @@ public class TelemetryProcessingService : BackgroundService
     private readonly TelemetryHistoryStore _historyStore;
     private readonly TimestampedLogStore _logStore;
     private readonly DeviceAlertTracker _alertTracker;
+    private readonly SensorHistoryTreeStore _historyTreeStore;
 
     public TelemetryProcessingService(
         TelemetryIngestionQueue queue,
         SensorStore sensorStore,
         TelemetryHistoryStore historyStore,
         TimestampedLogStore logStore,
-        DeviceAlertTracker alertTracker)
+        DeviceAlertTracker alertTracker,
+        SensorHistoryTreeStore historyTreeStore)
     {
         _queue = queue;
         _sensorStore = sensorStore;
         _historyStore = historyStore;
         _logStore = logStore;
         _alertTracker = alertTracker;
+        _historyTreeStore = historyTreeStore;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -54,6 +57,7 @@ public class TelemetryProcessingService : BackgroundService
         _sensorStore.UpdateReading(item.SensorId, item.Value);
         _historyStore.AddBatch(item.SensorId, new[] { item.Value });
         _logStore.Add(item);
+        _historyTreeStore.Add(item);
 
         var sensor = _sensorStore.Get(item.SensorId);
         if (sensor == null)
