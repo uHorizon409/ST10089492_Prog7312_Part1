@@ -21,6 +21,7 @@ builder.Services.AddHostedService<TelemetryProcessingService>();
 
 // part 3 additions
 builder.Services.AddSingleton<SensorHistoryTreeStore>();
+builder.Services.AddSingleton<MeshTopologyStore>();
 
 // client runs on a different port so it needs cors turned on to call the api
 builder.Services.AddCors(options =>
