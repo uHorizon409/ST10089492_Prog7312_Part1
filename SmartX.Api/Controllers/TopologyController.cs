@@ -62,7 +62,7 @@ public class TopologyController : ControllerBase
             }
         }
 
-        return Ok(new { Nodes = nodes, Edges = edges });
+        return Ok(new TopologyGraphResult { Nodes = nodes, Edges = edges });
     }
 
     // breadth first search from the gateway, whatever it doesnt reach is
@@ -81,7 +81,7 @@ public class TopologyController : ControllerBase
             .Concat(online.Select(s => s.MacAddress).Where(mac => !reachable.Contains(mac)))
             .ToList();
 
-        return Ok(new { Algorithm = useDfs ? "DFS" : "BFS", Reachable = reachable, Down = down });
+        return Ok(new ReachabilityResult { Algorithm = useDfs ? "DFS" : "BFS", Reachable = reachable, Down = down });
     }
 
     // prim's algorithm from the gateway outward, the result is the most
@@ -93,6 +93,6 @@ public class TopologyController : ControllerBase
         var (edges, totalWeight) = graph.ComputeMst(MeshNetworkGraph.GatewayId);
 
         var edgeDtos = edges.Select(e => new MeshEdgeDto { From = e.From, To = e.To, Weight = e.Weight }).ToList();
-        return Ok(new { Edges = edgeDtos, TotalWeight = totalWeight });
+        return Ok(new MstResult { Edges = edgeDtos, TotalWeight = totalWeight });
     }
 }
