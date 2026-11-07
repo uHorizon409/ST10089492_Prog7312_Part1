@@ -126,4 +126,28 @@ public class ApiClient
         var result = await _http.GetFromJsonAsync<SuggestionsResult>("api/actions/suggestions");
         return result ?? new SuggestionsResult();
     }
+
+    public async Task<TopologyGraphResult> GetTopologyGraphAsync()
+    {
+        var result = await _http.GetFromJsonAsync<TopologyGraphResult>("api/topology/graph");
+        return result ?? new TopologyGraphResult();
+    }
+
+    public async Task<ReachabilityResult> GetReachabilityAsync(bool useDfs = false)
+    {
+        var result = await _http.GetFromJsonAsync<ReachabilityResult>($"api/topology/reachable?useDfs={useDfs}");
+        return result ?? new ReachabilityResult();
+    }
+
+    public async Task<MstResult> GetMstAsync()
+    {
+        var result = await _http.GetFromJsonAsync<MstResult>("api/topology/mst");
+        return result ?? new MstResult();
+    }
+
+    public async Task<List<QueuedTelemetry>> GetHistoryRangeAsync(string sensorId, long fromTicks, long toTicks)
+    {
+        var result = await _http.GetFromJsonAsync<List<QueuedTelemetry>>($"api/topology/{sensorId}/history?from={fromTicks}&to={toTicks}");
+        return result ?? new List<QueuedTelemetry>();
+    }
 }
