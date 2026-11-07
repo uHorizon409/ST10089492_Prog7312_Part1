@@ -1,3 +1,5 @@
+using SmartX.Shared;
+
 namespace SmartX.Api.Data;
 
 // weighted undirected graph modelling the mesh, vertices are sensor mac
@@ -5,7 +7,7 @@ namespace SmartX.Api.Data;
 // links weighted by power cost
 public class MeshNetworkGraph
 {
-    public const string GatewayId = "GATEWAY";
+    public const string GatewayId = MeshTopologyConstants.GatewayId;
 
     private readonly Dictionary<string, List<(string Neighbor, int Weight)>> _adjacency = new();
 
