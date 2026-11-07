@@ -1,4 +1,4 @@
-# Smart-X IoT Mesh Gateway (PROG7312 POE Part 1 and Part 2)
+# Smart-X IoT Mesh Gateway (PROG7312 POE Part 1, Part 2 and Part 3)
 
 Data ingestion, validation and real-time processing gateway for the Smart-X IoT scenario. Built with .NET 10.
 
@@ -30,6 +30,16 @@ Data ingestion, validation and real-time processing gateway for the Smart-X IoT 
 - `HashSet<T>`: `SmartX.Api/Data/DeviceAlertTracker.cs`, dedupes repeated disconnect/anomaly alerts for the same device
 - Predictive Action Engine: `SmartX.Api/Data/ActionPatternEngine.cs`, tracks which actions (searches or commands) tend to follow which, plus `ActionsController` blends that with live anomaly flags into "Suggested Actions / Automated Insights"
 - Real-Time Command Stream page: `SmartX.Client/CommandStreamForm.cs`, live sensor grid, search/filter, manual override commands (trigger pump / toggle relay / shut down all valves), undo, suggestions panel, command history, per sensor timeline view
+
+### Part 3 additions
+
+- Historical telemetry range queries: `SmartX.Api/Data/SensorHistoryAvlTree.cs`, a real self balancing avl tree, one per sensor in `SensorHistoryTreeStore.cs`, so pulling a time range for one sensor never touches another sensor's history
+- Mesh network graph: `SmartX.Api/Data/MeshNetworkGraph.cs`, vertices are sensor mac addresses plus a virtual gateway, edges are simulated wireless links weighted by a deterministic power cost
+- Graph traversal: same file, `Bfs()` and `Dfs()`, run from the gateway to work out which sensors are actually reachable right now
+- Minimum spanning tree: same file, `ComputeMst()`, prim's algorithm from the gateway outward, this is the most power efficient backbone for telemetry to hop through the mesh
+- Self healing: `MeshTopologyStore.cs` builds the graph fresh from whichever sensors are currently online (the same 30 second disconnect check the dashboard already uses), an offline sensor gets no edges at all, so bfs/dfs and the mst both stop reaching it automatically and pick it back up the moment it starts reporting again
+- Network Topology and Mesh Routing page: `SmartX.Client/NetworkTopologyForm.cs`, draws the live mesh as a node link diagram, tracks a sensor's routing path to the gateway along the mst, and queries the avl tree for a sensor's history in a chosen time window
+- Main menu: all three pillars are enabled now and can be open at the same time, same non modal pattern as the other two
 
 ## Prerequisites
 
@@ -94,8 +104,6 @@ Make sure the API is already running first. The client reads the API address fro
 5. Click "Register New Sensor" to add your own, with MAC address, a location path (e.g. `Facility A > Zone 1 > Sub-Zone B`) and a category, optionally attaching a file
 6. Click "Aggregate Power Load" to sum up every power consumption sensor's current reading
 
-The "Network Topology and Mesh Routing" button is still disabled on purpose, that's the final PoE.
-
 ## Testing the Part 2 data structures
 
 Open **Real-Time Command Stream and History** from the main menu alongside the ingestion dashboard, both windows are non-modal now, so you can have both open side by side, each updating live every 2 seconds independently. Clicking a main menu button again just brings the existing window to the front instead of opening a duplicate.
@@ -124,3 +132,21 @@ Open **Real-Time Command Stream and History** from the main menu alongside the i
 6. Send three rising (or three falling) readings in a row for the same sensor, each one closer to its category's upper or lower limit but not past it yet, e.g. for an Environmental sensor (range 0-100) send 70, then 82, then 92. Before the sensor actually goes anomalous, Automated Insights will already flag it as "trending toward its limit", this is a proactive warning built from the sorted timeline history, not a reaction to something that already broke
 
 **To test the SortedDictionary timeline view:** select any row in the Command Stream grid and click View Timeline. Every reading the background service processes is recorded in `TimestampedLogStore` in timestamp order automatically, and this draws it as a real line graph, oldest reading on the left. Click Refresh on the timeline window while telemetry keeps coming in to watch it grow live.
+
+## Testing the Part 3 data structures
+
+Open **Network Topology and Mesh Routing** from the main menu, it can be open alongside both other pillars at once, all three update live and independently.
+
+**To test the avl tree range queries (Trees):**
+1. Register a sensor and send it a few readings a few seconds apart, either let the dashboard simulate it or hit the api directly
+2. On the Network Topology page, pick that sensor under Historical Log, set a From and To time that only covers some of the readings you just sent
+3. Click Load History, only the readings inside that window come back, not the sensor's entire history, this is the avl tree's range query doing the filtering, not a full scan of everything the sensor has ever reported. `GET /api/topology/{sensorId}/history?from=<ticks>&to=<ticks>` is the endpoint behind it if you want to call it directly
+
+**To test the mesh graph, bfs/dfs reachability and the mst (Graphs):**
+1. Register two or three sensors and let each report at least once so they count as online
+2. The diagram draws every sensor around a central Gateway node, thin grey lines are the full mesh, thick green lines are the current minimum spanning tree
+3. Pick a sensor under Track Routing Path and click Track, its path to the gateway is listed and highlighted in orange on the diagram, sometimes this hops through another sensor instead of going straight to the gateway if that works out cheaper
+4. Stop sending that sensor readings and wait 30+ seconds, the sensor turns red on the diagram and drops out of both the mesh and the mst, tracking it again correctly reports it has no route
+5. Send it a reading again, within a couple of refreshes it reappears on the diagram and gets a route back
+
+`GET /api/topology/graph`, `GET /api/topology/reachable` (add `?useDfs=true` for depth first instead of breadth first) and `GET /api/topology/mst` are the three endpoints behind all of this, each one rebuilds the graph fresh from whichever sensors are online at that moment.
