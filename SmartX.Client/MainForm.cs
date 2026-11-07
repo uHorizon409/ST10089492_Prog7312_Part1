@@ -1,7 +1,6 @@
 namespace SmartX.Client;
 
-// startup menu, the three pillars from the brief, only the first one is
-// wired up for part 1, the other two get built later in the poe
+// startup menu, all three pillars from the brief are wired up now
 public class MainForm : Form
 {
     private readonly ApiClient _apiClient = new(AppConfig.GetApiBaseUrl());
@@ -13,6 +12,7 @@ public class MainForm : Form
     // between them not block each other
     private DashboardForm? _dashboardForm;
     private CommandStreamForm? _commandStreamForm;
+    private NetworkTopologyForm? _topologyForm;
 
     public MainForm()
     {
@@ -57,13 +57,13 @@ public class MainForm : Form
 
         var meshButton = new Button
         {
-            Text = "Network Topology and Mesh Routing (Coming Soon)",
+            Text = "Network Topology and Mesh Routing",
             Location = new Point(20, 220),
             Width = 400,
             Height = 50,
-            Enabled = false,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
+        meshButton.Click += MeshButton_Click;
 
         Controls.Add(title);
         Controls.Add(ingestionButton);
@@ -108,6 +108,26 @@ public class MainForm : Form
         else
         {
             _commandStreamForm.Activate();
+        }
+    }
+
+    private void MeshButton_Click(object? sender, EventArgs e)
+    {
+        if (_topologyForm == null || _topologyForm.IsDisposed)
+        {
+            _topologyForm = new NetworkTopologyForm(_apiClient);
+            _topologyForm.FormClosed += (s, e) => _topologyForm = null;
+
+            // offset again so all three pillars can be open without
+            // landing exactly on top of each other
+            _topologyForm.StartPosition = FormStartPosition.Manual;
+            _topologyForm.Location = new Point(Location.X + 170, Location.Y + 130);
+
+            _topologyForm.Show(this);
+        }
+        else
+        {
+            _topologyForm.Activate();
         }
     }
 }
