@@ -41,6 +41,59 @@ Data ingestion, validation and real-time processing gateway for the Smart-X IoT 
 - Network Topology and Mesh Routing page: `SmartX.Client/NetworkTopologyForm.cs`, draws the live mesh as a node link diagram, tracks a sensor's routing path to the gateway along the mst, and queries the avl tree for a sensor's history in a chosen time window
 - Main menu: all three pillars are enabled now and can be open at the same time, same non modal pattern as the other two
 
+### Part 3 code examples
+
+**AVL tree rebalancing** (`SmartX.Api/Data/SensorHistoryAvlTree.cs`), this is what keeps a range query logarithmic instead of linear, every insert rebalances immediately so the tree never degrades into a straight line no matter what order readings arrive in:
+
+```csharp
+private static Node RotateRight(Node node)
+{
+    var newRoot = node.Left!;
+    node.Left = newRoot.Right;
+    newRoot.Right = node;
+    node.Height = 1 + Math.Max(Height(node.Left), Height(node.Right));
+    newRoot.Height = 1 + Math.Max(Height(newRoot.Left), Height(newRoot.Right));
+    return newRoot;
+}
+```
+
+`RotateLeft` is the mirror image of this. `Rebalance()` compares left and right subtree heights after every insert and calls one or both rotations when the tree has tipped more than one level out of balance, this is what guarantees `O(log n)` lookups even under a worst case strictly increasing or decreasing stream of timestamps, which is exactly how real telemetry arrives.
+
+**Prim's minimum spanning tree** (`SmartX.Api/Data/MeshNetworkGraph.cs`), starts from the gateway vertex and always grows by the cheapest edge reachable from whatever is already in the tree:
+
+```csharp
+while (inTree.Count < Vertices.Count)
+{
+    string? bestFrom = null;
+    string? bestTo = null;
+    int bestWeight = int.MaxValue;
+
+    foreach (var vertex in inTree)
+    {
+        foreach (var (neighbor, weight) in GetNeighbors(vertex))
+        {
+            if (!inTree.Contains(neighbor) && weight < bestWeight)
+            {
+                bestWeight = weight;
+                bestFrom = vertex;
+                bestTo = neighbor;
+            }
+        }
+    }
+
+    if (bestTo == null)
+    {
+        break;
+    }
+
+    edges.Add((bestFrom!, bestTo, bestWeight));
+    inTree.Add(bestTo);
+    totalWeight += bestWeight;
+}
+```
+
+The `if (bestTo == null) break;` is what makes this safe to run against a partially offline mesh, if the vertices already in the tree have no cheaper edge left to anything outside it, the loop stops instead of looping forever, which is exactly what happens when some sensors are disconnected and have no edges in the graph at all.
+
 ## Prerequisites
 
 - .NET 10 SDK
